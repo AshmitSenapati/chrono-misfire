@@ -5,8 +5,15 @@ export default class BootScene extends Phaser.Scene {
     super("BootScene");
   }
 
+  preload() {
+    this.load.audio("shoot", "assets/sfx/shoot.wav");
+    this.load.audio("correct", "assets/sfx/correct.wav");
+    this.load.audio("wrong", "assets/sfx/wrong.wav");
+    this.load.audio("win", "assets/sfx/win.wav");
+    this.load.audio("lose", "assets/sfx/lose.wav");
+  }
+
   create() {
-    // No assets needed (we use simple shapes)
-    this.scene.start("GameScene");
+    this.scene.start("MenuScene");
   }
 }
