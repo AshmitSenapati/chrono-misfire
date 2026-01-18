@@ -6,7 +6,6 @@ export default class GameScene extends Phaser.Scene {
   }
 
   init() {
-    // ===== Difficulty (UNCHANGED)
     this.timeScale = 1.0;
     this.minTimeScale = 1.0;
     this.maxTimeScale = 6.0;
@@ -15,52 +14,41 @@ export default class GameScene extends Phaser.Scene {
     this.wrongHitDelta = +0.30;
     this.missDelta = +0.10;
 
-    // Win condition
     this.surviveTime = 60;
     this.elapsed = 0;
 
-    // Runner
     this.baseRunSpeed = 220;
     this.groundY = 430;
 
-    // Target spawning
     this.spawnBaseDelay = 850;
     this.spawnTimer = 0;
 
-    // Combo
     this.combo = 0;
     this.maxComboBonus = 0.25;
 
-    // Waves
     this.wave = 1;
     this.waveThresholds = [0, 15, 30, 45];
 
-    // Ammo system
     this.maxAmmo = 8;
     this.ammo = this.maxAmmo;
     this.reloadTimeMs = 900;
     this.reloading = false;
 
-    // Gates
     this.gateSpawnTimer = 0;
-    this.gateBaseDelay = 3200;
+    this.gateBaseDelay = 5000;
 
-    // Game state
     this.gameOver = false;
   }
 
   create() {
     const { width, height } = this.scale;
 
-    // ===== Parallax background (simple)
     this.bgGraphics1 = this.add.graphics();
     this.bgGraphics2 = this.add.graphics();
     this.drawBackground();
 
-    // Ground line
     this.add.rectangle(width / 2, this.groundY + 30, width, 4, 0x334155);
 
-    // ===== UI
     this.add.text(16, 10, "Chrono Misfire: Runner Mode", {
       fontSize: "22px",
       color: "#ffffff",
@@ -111,7 +99,6 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(200);
 
-    // ===== Player
     this.player = this.add.rectangle(140, this.groundY, 42, 58, 0x60a5fa);
     this.physics.add.existing(this.player);
     this.player.body.setAllowGravity(false);
@@ -119,22 +106,18 @@ export default class GameScene extends Phaser.Scene {
 
     this.gunTip = this.add.circle(this.player.x + 26, this.player.y - 10, 4, 0xffffff);
 
-    // Crosshair
     this.crosshair = this.add.circle(width / 2, height / 2, 6, 0xffffff).setDepth(10);
 
-    // ===== Groups
     this.bullets = this.physics.add.group({ maxSize: 60 });
     this.targets = this.physics.add.group();
     this.gates = this.physics.add.group();
 
-    // ===== Keyboard (restart fix)
     this.keys = this.input.keyboard.addKeys({
       restart: Phaser.Input.Keyboard.KeyCodes.R,
       menu: Phaser.Input.Keyboard.KeyCodes.M,
       reload: Phaser.Input.Keyboard.KeyCodes.SPACE
     });
 
-    // ===== Mouse input
     this.input.on("pointermove", (pointer) => {
       this.crosshair.setPosition(pointer.x, pointer.y);
     });
@@ -144,7 +127,6 @@ export default class GameScene extends Phaser.Scene {
       this.tryShoot(pointer.x, pointer.y);
     });
 
-    // ===== Collisions
     this.physics.add.overlap(this.bullets, this.targets, (bullet, target) => {
       this.onBulletHitTarget(bullet, target);
     });
@@ -153,17 +135,14 @@ export default class GameScene extends Phaser.Scene {
       if (!gate.isOpen) this.endGame(false);
     });
 
-    // ===== Initial spawns
     this.spawnTarget();
     this.spawnTarget();
     this.spawnTarget();
   }
 
-  // ===== Parallax background draw
   drawBackground() {
     const { width, height } = this.scale;
 
-    // Layer 1 (far)
     this.bgGraphics1.clear();
     this.bgGraphics1.fillStyle(0x0b0f1a, 1);
     this.bgGraphics1.fillRect(0, 0, width, height);
@@ -175,7 +154,6 @@ export default class GameScene extends Phaser.Scene {
       this.bgGraphics1.fillRect(x, height - 160 - h, 50, h);
     }
 
-    // Layer 2 (near)
     this.bgGraphics2.clear();
     this.bgGraphics2.fillStyle(0x1f2937, 0.9);
     for (let i = 0; i < 24; i++) {
@@ -185,7 +163,6 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // ===== Restart cleanup
   safeRestart() {
     this.time.removeAllEvents();
 
@@ -205,7 +182,6 @@ export default class GameScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  // ===== Ammo
   tryShoot(x, y) {
     if (this.reloading) return;
 
@@ -242,7 +218,6 @@ export default class GameScene extends Phaser.Scene {
     this.ammoText.setColor("#e2e8f0");
   }
 
-  // ===== Shooting
   shoot(x, y) {
     if (this.sound && this.sound.get("shoot")) {
       this.sound.play("shoot", { volume: 0.35 });
@@ -263,7 +238,6 @@ export default class GameScene extends Phaser.Scene {
 
     bullet.body.setVelocity(dir.x * speed, dir.y * speed);
 
-    // Miss penalty
     this.time.delayedCall(850, () => {
       if (!bullet.active) return;
       bullet.destroy();
@@ -271,7 +245,6 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ===== Targets
   spawnTarget() {
     const { width } = this.scale;
 
@@ -306,7 +279,6 @@ export default class GameScene extends Phaser.Scene {
     target.label = label;
     target.passed = false;
 
-    // Zigzag movement
     target.zigzag = Math.random() < 0.35;
     target.zigzagDir = Math.random() < 0.5 ? -1 : 1;
 
@@ -318,7 +290,6 @@ export default class GameScene extends Phaser.Scene {
     target.destroy();
   }
 
-  // ===== Gates
   spawnGate() {
     const { width } = this.scale;
 
@@ -354,7 +325,6 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ===== Hit logic
   onBulletHitTarget(bullet, target) {
     bullet.destroy();
 
@@ -378,7 +348,6 @@ export default class GameScene extends Phaser.Scene {
     this.applyTimeChange(this.correctHitDelta - bonus);
     this.pulseUI(true);
 
-    // Gate interaction: correct hits damage closest gate
     const gates = this.gates.getChildren();
     if (gates.length > 0) {
       const closest = gates[0];
@@ -407,7 +376,6 @@ export default class GameScene extends Phaser.Scene {
     this.pulseUI(false);
   }
 
-  // ===== Time system
   applyTimeChange(delta) {
     this.timeScale = Phaser.Math.Clamp(
       this.timeScale + delta,
@@ -420,7 +388,6 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // ===== Feedback
   pulseUI(good) {
     const color = good ? "#22c55e" : "#ef4444";
     this.timeScaleText.setColor(color);
@@ -446,7 +413,6 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ===== End
   endGame(win) {
     this.gameOver = true;
 
@@ -468,7 +434,6 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(_, dt) {
-    // Always allow restart/menu
     if (Phaser.Input.Keyboard.JustDown(this.keys.restart)) {
       this.safeRestart();
       return;
@@ -483,7 +448,6 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.gameOver) return;
 
-    // Parallax movement
     this.bgGraphics1.x -= 0.15 * this.timeScale;
     this.bgGraphics2.x -= 0.35 * this.timeScale;
 
@@ -492,7 +456,6 @@ export default class GameScene extends Phaser.Scene {
 
     const scaledDt = dt * this.timeScale;
 
-    // Timer
     this.elapsed += scaledDt / 1000;
     const remaining = Math.max(0, this.surviveTime - this.elapsed);
 
@@ -501,17 +464,14 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Waves
     const e = this.elapsed;
     if (e >= this.waveThresholds[3]) this.wave = 4;
     else if (e >= this.waveThresholds[2]) this.wave = 3;
     else if (e >= this.waveThresholds[1]) this.wave = 2;
     else this.wave = 1;
 
-    // Runner movement illusion
     const runSpeed = this.baseRunSpeed * this.timeScale;
 
-    // Move targets left + zigzag
     this.targets.getChildren().forEach((t) => {
       t.x -= (runSpeed * scaledDt) / 1000;
 
@@ -523,7 +483,6 @@ export default class GameScene extends Phaser.Scene {
 
       if (t.label) t.label.setPosition(t.x, t.y);
 
-      // Passed player => miss if correct
       if (!t.passed && t.x < this.player.x - 30) {
         t.passed = true;
         if (t.isCorrect) this.onMiss();
@@ -531,7 +490,6 @@ export default class GameScene extends Phaser.Scene {
       }
     });
 
-    // Move gates left
     this.gates.getChildren().forEach((g) => {
       g.x -= (runSpeed * scaledDt) / 1000;
       if (g.label) g.label.setPosition(g.x, g.y - 80);
@@ -542,7 +500,6 @@ export default class GameScene extends Phaser.Scene {
       }
     });
 
-    // Spawn targets (same logic)
     this.spawnTimer += scaledDt;
 
     const waveFactor =
@@ -555,17 +512,14 @@ export default class GameScene extends Phaser.Scene {
       this.spawnTarget();
     }
 
-    // Spawn gates (mild frequency)
     this.gateSpawnTimer += scaledDt;
     if (this.gateSpawnTimer >= this.gateBaseDelay) {
       this.gateSpawnTimer = 0;
       this.spawnGate();
     }
 
-    // Update gun tip
     this.gunTip.setPosition(this.player.x + 26, this.player.y - 10);
 
-    // UI
     this.timeScaleText.setText(`Speed: ${this.timeScale.toFixed(2)}x`);
     this.timerText.setText(`Survive: ${Math.ceil(remaining)}s`);
     this.waveText.setText(`Wave: ${this.wave}`);
@@ -575,7 +529,6 @@ export default class GameScene extends Phaser.Scene {
       this.updateAmmoUI();
     }
 
-    // Time bar
     const pct = (this.timeScale - this.minTimeScale) / (this.maxTimeScale - this.minTimeScale);
     const w = Phaser.Math.Clamp(220 * (1 - pct), 0, 220);
     this.timeBarFill.width = w;

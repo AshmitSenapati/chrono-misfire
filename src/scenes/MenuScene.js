@@ -49,7 +49,6 @@ export default class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // small pulse animation
     this.tweens.add({
       targets: playText,
       alpha: 0.4,
