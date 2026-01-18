@@ -3,32 +3,38 @@ import Phaser from "phaser";
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super("GameScene");
+  }
 
-    // ===== Core Twist: Time changes based on accuracy
-    this.timeScale = 1.0;
-    this.minTimeScale = 0.6;
-    this.maxTimeScale = 4.0;
+  // 🔥 Reset everything cleanly here
+  init() {
+    // ===== Twisted Mechanic (Runner Mode + Hard Difficulty)
+    this.timeScale = 1.5;
+    this.minTimeScale = 1.5;
+    this.maxTimeScale = 6.0;
 
-    // Base deltas
-    this.correctHitDelta = -0.15;
-    this.wrongHitDelta = +0.25;
-    this.missDelta = +0.10; // reduced for fairness
+    this.correctHitDelta = -0.20;
+    this.wrongHitDelta = +0.30;
+    this.missDelta = +0.10;
 
     // Win condition
     this.surviveTime = 60;
     this.elapsed = 0;
 
-    // Spawning
-    this.spawnBaseDelay = 900;
+    // Runner
+    this.baseRunSpeed = 220;
+    this.groundY = 430;
+
+    // Spawn
+    this.spawnBaseDelay = 850;
     this.spawnTimer = 0;
 
-    // Combo system
+    // Combo
     this.combo = 0;
-    this.maxComboBonus = 0.18; // extra slow-down at high streaks
+    this.maxComboBonus = 0.25;
 
-    // Waves / progression
+    // Waves
     this.wave = 1;
-    this.waveThresholds = [0, 15, 30, 45]; // seconds elapsed -> wave changes
+    this.waveThresholds = [0, 15, 30, 45];
 
     this.gameOver = false;
   }
@@ -36,25 +42,25 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // Background
+    // ===== Background
     this.add.rectangle(width / 2, height / 2, width, height, 0x0b0f1a);
+    this.add.rectangle(width / 2, this.groundY + 30, width, 4, 0x334155);
 
-    // Title + help
-    this.add.text(16, 10, "Chrono Misfire", {
+    // ===== UI
+    this.add.text(16, 10, "Chrono Misfire: Runner Mode", {
       fontSize: "22px",
       color: "#ffffff",
       fontStyle: "bold"
     });
 
-    this.helpText = this.add.text(
+    this.add.text(
       16,
       40,
-      "Shoot ✔ targets | Avoid ✖\nCorrect = slows time | Wrong/Miss = speeds time\nR = Restart",
+      "Runner auto-moves → Shoot ✔ targets on the way\nCorrect = slows time | Wrong/Miss = speeds time\nR = Restart | M = Menu",
       { fontSize: "16px", color: "#cbd5e1" }
     );
 
-    // UI
-    this.timeScaleText = this.add.text(16, 105, "Time: 1.00x", {
+    this.timeScaleText = this.add.text(16, 105, "Speed: 2.00x", {
       fontSize: "18px",
       color: "#e2e8f0"
     });
@@ -74,11 +80,9 @@ export default class GameScene extends Phaser.Scene {
       color: "#e2e8f0"
     });
 
-    // Time bar background
     this.timeBarBg = this.add.rectangle(16, 215, 220, 14, 0x1f2937).setOrigin(0, 0.5);
     this.timeBarFill = this.add.rectangle(16, 215, 220, 14, 0x22c55e).setOrigin(0, 0.5);
 
-    // Status text
     this.statusText = this.add
       .text(width / 2, height / 2, "", {
         fontSize: "44px",
@@ -88,14 +92,28 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(50);
 
+    // ===== Player
+    this.player = this.add.rectangle(140, this.groundY, 42, 58, 0x60a5fa);
+    this.physics.add.existing(this.player);
+    this.player.body.setAllowGravity(false);
+    this.player.body.setImmovable(true);
+
+    this.gunTip = this.add.circle(this.player.x + 26, this.player.y - 10, 4, 0xffffff);
+
     // Crosshair
     this.crosshair = this.add.circle(width / 2, height / 2, 6, 0xffffff).setDepth(10);
 
-    // Groups
-    this.bullets = this.physics.add.group({ maxSize: 40 });
+    // ===== Groups
+    this.bullets = this.physics.add.group({ maxSize: 60 });
     this.targets = this.physics.add.group();
 
-    // Input
+    // ===== Keyboard (RESTART FIX)
+    this.keys = this.input.keyboard.addKeys({
+      restart: Phaser.Input.Keyboard.KeyCodes.R,
+      menu: Phaser.Input.Keyboard.KeyCodes.M
+    });
+
+    // ===== Mouse input
     this.input.on("pointermove", (pointer) => {
       this.crosshair.setPosition(pointer.x, pointer.y);
     });
@@ -105,33 +123,47 @@ export default class GameScene extends Phaser.Scene {
       this.shoot(pointer.x, pointer.y);
     });
 
-    this.input.keyboard.on("keydown-M", () => {
-    this.scene.start("MenuScene");
-    });
-
-    this.input.keyboard.on("keydown-R", () => {
-      this.scene.restart();
-    });
-
-    // Collision
+    // ===== Collisions
     this.physics.add.overlap(this.bullets, this.targets, (bullet, target) => {
       this.onBulletHitTarget(bullet, target);
     });
 
-    // Spawn initial targets
+    // ===== Spawn initial targets
     this.spawnTarget();
     this.spawnTarget();
     this.spawnTarget();
   }
 
-  // ===== Shooting
+  // ===== Restart cleanup (IMPORTANT)
+  safeRestart() {
+    // kill all timed events
+    this.time.removeAllEvents();
+
+    // destroy all bullets and targets safely
+    if (this.bullets) {
+      this.bullets.getChildren().forEach((b) => b.destroy());
+      this.bullets.clear(true, true);
+    }
+
+    if (this.targets) {
+      this.targets.getChildren().forEach((t) => {
+        if (t.label) t.label.destroy();
+        t.destroy();
+      });
+      this.targets.clear(true, true);
+    }
+
+    // restart scene fresh (calls init() again)
+    this.scene.restart();
+  }
+
   shoot(x, y) {
-    const { width, height } = this.scale;
+    if (this.sound && this.sound.get("shoot")) {
+      this.sound.play("shoot", { volume: 0.35 });
+    }
 
-    this.sound.play("shoot", { volume: 0.35 });
-
-    const startX = width / 2;
-    const startY = height - 40;
+    const startX = this.player.x + 28;
+    const startY = this.player.y - 10;
 
     const bullet = this.add.circle(startX, startY, 5, 0xffffff);
     this.physics.add.existing(bullet);
@@ -141,30 +173,30 @@ export default class GameScene extends Phaser.Scene {
     this.bullets.add(bullet);
 
     const dir = new Phaser.Math.Vector2(x - startX, y - startY).normalize();
-    const speed = 720;
+    const speed = 850;
 
     bullet.body.setVelocity(dir.x * speed, dir.y * speed);
 
-    // Lifetime
-    this.time.delayedCall(900, () => {
+    // miss penalty
+    this.time.delayedCall(850, () => {
       if (!bullet.active) return;
       bullet.destroy();
-
-      // Miss penalty (small)
       this.onMiss();
     });
   }
 
-  // ===== Targets
   spawnTarget() {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
 
-    // Wave influences probability and movement
-    const correctChance = this.wave === 1 ? 0.75 : this.wave === 2 ? 0.65 : 0.55;
+    const correctChance =
+      this.wave === 1 ? 0.75 : this.wave === 2 ? 0.62 : this.wave === 3 ? 0.55 : 0.5;
+
     const isCorrect = Math.random() < correctChance;
 
-    const x = Phaser.Math.Between(90, width - 90);
-    const y = Phaser.Math.Between(100, height - 220);
+    const x = width + Phaser.Math.Between(40, 200);
+
+    const yChoices = [this.groundY - 70, this.groundY - 20, this.groundY - 120];
+    const y = Phaser.Utils.Array.GetRandom(yChoices);
 
     const color = isCorrect ? 0x22c55e : 0xef4444;
 
@@ -186,31 +218,9 @@ export default class GameScene extends Phaser.Scene {
 
     target.label = label;
 
-    // Movement scales by wave + timeScale
-    let baseMove = this.wave === 1 ? 60 : this.wave === 2 ? 120 : 170;
-    baseMove *= this.timeScale;
-
-    const vx = Phaser.Math.Between(-baseMove, baseMove);
-    const vy = Phaser.Math.Between(-baseMove * 0.7, baseMove * 0.7);
-
-    target.body.setVelocity(vx, vy);
-    target.body.setCollideWorldBounds(true);
-    target.body.setBounce(1, 1);
+    target.passed = false;
 
     this.targets.add(target);
-
-    // Despawn time reduces with waves
-    const lifetime = this.wave === 1 ? 2600 : this.wave === 2 ? 2300 : 2000;
-
-    this.time.delayedCall(lifetime, () => {
-      if (!target.active) return;
-
-      const wasCorrect = target.isCorrect;
-      this.removeTarget(target);
-
-      // Only punish if a correct target escaped
-      if (wasCorrect) this.onMiss();
-    });
   }
 
   removeTarget(target) {
@@ -218,28 +228,23 @@ export default class GameScene extends Phaser.Scene {
     target.destroy();
   }
 
-  // ===== Hit Logic
   onBulletHitTarget(bullet, target) {
     bullet.destroy();
 
-    if (target.isCorrect) {
-      this.onCorrectHit();
-    } else {
-      this.onWrongHit();
-    }
+    if (target.isCorrect) this.onCorrectHit();
+    else this.onWrongHit();
 
-    // Feedback pop
     this.flashAt(target.x, target.y, target.isCorrect);
-
     this.removeTarget(target);
   }
 
   onCorrectHit() {
     this.combo += 1;
 
-    this.sound.play("correct", { volume: 0.5 });
+    if (this.sound && this.sound.get("correct")) {
+      this.sound.play("correct", { volume: 0.5 });
+    }
 
-    // Combo bonus: more reward for consistent accuracy
     const comboFactor = Phaser.Math.Clamp(this.combo / 10, 0, 1);
     const bonus = comboFactor * this.maxComboBonus;
 
@@ -250,11 +255,13 @@ export default class GameScene extends Phaser.Scene {
   onWrongHit() {
     this.combo = 0;
 
-    this.sound.play("wrong", { volume: 0.6 });
+    if (this.sound && this.sound.get("wrong")) {
+      this.sound.play("wrong", { volume: 0.6 });
+    }
 
     this.applyTimeChange(this.wrongHitDelta);
     this.pulseUI(false);
-    this.cameras.main.shake(90, 0.006);
+    this.cameras.main.shake(90, 0.007);
   }
 
   onMiss() {
@@ -263,7 +270,6 @@ export default class GameScene extends Phaser.Scene {
     this.pulseUI(false);
   }
 
-  // ===== Time System
   applyTimeChange(delta) {
     this.timeScale = Phaser.Math.Clamp(
       this.timeScale + delta,
@@ -276,7 +282,6 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // ===== Feedback Helpers
   pulseUI(good) {
     const color = good ? "#22c55e" : "#ef4444";
     this.timeScaleText.setColor(color);
@@ -302,37 +307,42 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ===== End Game
   endGame(win) {
     this.gameOver = true;
 
-    this.sound.play(win ? "win" : "lose", { volume: 0.7 });
+    if (this.sound) {
+      const key = win ? "win" : "lose";
+      if (this.sound.get(key)) this.sound.play(key, { volume: 0.7 });
+    }
 
     this.statusText.setText(win ? "YOU WIN 🎉" : "TIME OVERLOAD 💥");
     this.statusText.setColor(win ? "#22c55e" : "#ef4444");
 
     this.add
-  .text(this.scale.width / 2, this.scale.height / 2 + 90, "Click to go to Menu", {
-    fontSize: "18px",
-    color: "#cbd5e1"
-  })
-  .setOrigin(0.5)
-  .setDepth(50);
-
-    this.input.once("pointerdown", () => {
-    this.scene.start("MenuScene");
-    });
-
+      .text(this.scale.width / 2, this.scale.height / 2 + 70, "Press R to Restart | M for Menu", {
+        fontSize: "18px",
+        color: "#cbd5e1"
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
   }
 
-  // ===== Update Loop
   update(_, dt) {
+    // ✅ Restart/menu works ALWAYS (even after game over)
+    if (Phaser.Input.Keyboard.JustDown(this.keys.restart)) {
+      this.safeRestart();
+      return;
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.menu)) {
+      this.scene.start("MenuScene");
+      return;
+    }
+
     if (this.gameOver) return;
 
-    // Scale gameplay time
     const scaledDt = dt * this.timeScale;
 
-    // Update survival timer
+    // Timer
     this.elapsed += scaledDt / 1000;
     const remaining = Math.max(0, this.surviveTime - this.elapsed);
 
@@ -341,17 +351,33 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Update wave based on elapsed time
+    // Waves
     const e = this.elapsed;
     if (e >= this.waveThresholds[3]) this.wave = 4;
     else if (e >= this.waveThresholds[2]) this.wave = 3;
     else if (e >= this.waveThresholds[1]) this.wave = 2;
     else this.wave = 1;
 
-    // Spawn rate increases as time gets faster + later waves
+    // Runner effect
+    const runSpeed = this.baseRunSpeed * this.timeScale;
+
+    this.targets.getChildren().forEach((t) => {
+      t.x -= (runSpeed * scaledDt) / 1000;
+      if (t.label) t.label.setPosition(t.x, t.y);
+
+      if (!t.passed && t.x < this.player.x - 30) {
+        t.passed = true;
+        if (t.isCorrect) this.onMiss();
+        this.removeTarget(t);
+      }
+    });
+
+    // Spawn
     this.spawnTimer += scaledDt;
 
-    const waveFactor = this.wave === 1 ? 1.0 : this.wave === 2 ? 0.85 : this.wave === 3 ? 0.72 : 0.62;
+    const waveFactor =
+      this.wave === 1 ? 1.0 : this.wave === 2 ? 0.85 : this.wave === 3 ? 0.72 : 0.62;
+
     const dynamicDelay = (this.spawnBaseDelay * waveFactor) / this.timeScale;
 
     if (this.spawnTimer >= dynamicDelay) {
@@ -359,23 +385,19 @@ export default class GameScene extends Phaser.Scene {
       this.spawnTarget();
     }
 
-    // Keep labels aligned
-    this.targets.getChildren().forEach((t) => {
-      if (t.label) t.label.setPosition(t.x, t.y);
-    });
+    // Update gun tip
+    this.gunTip.setPosition(this.player.x + 26, this.player.y - 10);
 
-    // UI update
-    this.timeScaleText.setText(`Time: ${this.timeScale.toFixed(2)}x`);
+    // UI
+    this.timeScaleText.setText(`Speed: ${this.timeScale.toFixed(2)}x`);
     this.timerText.setText(`Survive: ${Math.ceil(remaining)}s`);
     this.waveText.setText(`Wave: ${this.wave}`);
     this.comboText.setText(`Combo: ${this.combo}`);
 
-    // Time bar fill (green -> red as time increases)
     const pct = (this.timeScale - this.minTimeScale) / (this.maxTimeScale - this.minTimeScale);
     const w = Phaser.Math.Clamp(220 * (1 - pct), 0, 220);
     this.timeBarFill.width = w;
 
-    // Change bar color based on danger
     if (pct < 0.35) this.timeBarFill.fillColor = 0x22c55e;
     else if (pct < 0.7) this.timeBarFill.fillColor = 0xf59e0b;
     else this.timeBarFill.fillColor = 0xef4444;
